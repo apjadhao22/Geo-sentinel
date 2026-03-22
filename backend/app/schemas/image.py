@@ -21,3 +21,7 @@ class ImageCompare(BaseModel):
     after_url: str
     before_captured_at: datetime
     after_captured_at: datetime
+
+
+class ImageTileResponse(BaseModel):
+    url: str

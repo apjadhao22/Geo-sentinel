@@ -9,7 +9,7 @@ from app.dependencies import get_current_user
 from app.models.detection import Detection
 from app.models.satellite_image import SatelliteImage
 from app.models.user import User
-from app.schemas.image import ImageCompare
+from app.schemas.image import ImageCompare, ImageTileResponse
 from app.storage import get_presigned_url
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -28,6 +28,8 @@ async def compare_images(
 
     before = await db.get(SatelliteImage, detection.image_before_id)
     after = await db.get(SatelliteImage, detection.image_after_id)
+    if not before or not after:
+        raise HTTPException(status_code=404, detail="Referenced satellite image not found")
 
     return ImageCompare(
         before_url=get_presigned_url(before.storage_path),
@@ -37,7 +39,7 @@ async def compare_images(
     )
 
 
-@router.get("/{image_id}/tile")
+@router.get("/{image_id}/tile", response_model=ImageTileResponse)
 async def get_image_tile(
     image_id: UUID,
     db: AsyncSession = Depends(get_db),

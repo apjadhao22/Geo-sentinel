@@ -55,12 +55,14 @@ class Sentinel2Provider(ImageryProvider):
         token = await self._get_token()
         download_url = f"https://zipper.dataspace.copernicus.eu/odata/v1/Products({image_id})/$value"
         async with httpx.AsyncClient(timeout=300) as client:
-            response = await client.get(
+            async with client.stream(
+                "GET",
                 download_url,
                 headers={"Authorization": f"Bearer {token}"},
                 follow_redirects=True,
-            )
-            response.raise_for_status()
-            with open(output_path, "wb") as f:
-                f.write(response.content)
+            ) as response:
+                response.raise_for_status()
+                with open(output_path, "wb") as f:
+                    async for chunk in response.aiter_bytes(chunk_size=1024 * 1024):
+                        f.write(chunk)
         return output_path

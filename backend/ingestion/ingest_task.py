@@ -49,21 +49,27 @@ async def run_ingestion(max_retries: int = 3):
         return {"status": "no_images", "message": "No usable images found"}
 
     results = []
-    for img_meta in images[:1]:  # Process latest image
-        image_id = img_meta.get("Id") or img_meta.get("id")
-        with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp:
-            tmp_path = tmp.name
+    # Process only the latest image (images[:1] — expand slice to process multiple in future)
+    img_meta = images[0]
+    image_id = img_meta.get("Id") or img_meta.get("id")
+    if not image_id:
+        return {"status": "error", "message": "Image metadata missing ID field"}
 
+    with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
         await provider.download_image(image_id, tmp_path)
-
         object_name = f"raw/{end_date.strftime('%Y/%m/%d')}/{uuid4()}.tif"
         upload_image(object_name, tmp_path)
-        os.unlink(tmp_path)
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
-        results.append({
-            "image_id": image_id,
-            "storage_path": object_name,
-            "captured_at": img_meta.get("ContentDate", {}).get("Start"),
-        })
+    results.append({
+        "image_id": image_id,
+        "storage_path": object_name,
+        "captured_at": img_meta.get("ContentDate", {}).get("Start"),
+    })
 
     return {"status": "success", "images": results}

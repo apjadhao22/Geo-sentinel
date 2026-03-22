@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+
+# Environment
+.env
+
+# ML weights
+backend/ml/weights/*.pt
+backend/ml/weights/*.pth
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# MinIO data
+minio_data/

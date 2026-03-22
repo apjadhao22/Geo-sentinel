@@ -1,10 +1,23 @@
 from __future__ import annotations
 import numpy as np
 import torch
-from typing import Generator
+from typing import Any, Generator
 
 PATCH_SIZE = 256
 PATCH_OVERLAP = 32
+
+
+def load_image_with_transform(path: str) -> tuple[np.ndarray, Any]:
+    """Returns (CHW float32 array, rasterio.Affine transform)."""
+    import rasterio
+    with rasterio.open(path) as src:
+        bands_to_read = min(src.count, 3)
+        data = src.read(list(range(1, bands_to_read + 1))).astype(np.float32)
+        transform = src.transform
+    while data.shape[0] < 3:
+        data = np.concatenate([data, data[-1:]], axis=0)
+    data = np.clip(data, 0, 10000) / 10000.0
+    return data, transform
 
 
 def load_and_normalize(path: str) -> np.ndarray:

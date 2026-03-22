@@ -3,13 +3,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.database import get_db
 from app.models.user import User
+from app.models.satellite_image import SatelliteImage
+from app.models.zone import Zone
 from app.schemas.user import UserOut, UserCreate, UserUpdate
 from app.services.auth_service import hash_password
 from app.dependencies import require_role
+from app.config import settings
 
 router = APIRouter(tags=["admin"])
 
@@ -65,3 +68,29 @@ async def update_user(
     await db.commit()
     await db.refresh(user)
     return user
+
+
+@router.get("/system/health")
+async def system_health(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin", "super_admin")),
+):
+    last_image = await db.execute(
+        select(SatelliteImage).order_by(SatelliteImage.ingested_at.desc()).limit(1)
+    )
+    last = last_image.scalar_one_or_none()
+
+    return {
+        "last_ingestion": last.ingested_at.isoformat() if last else None,
+        "last_image_usable": last.is_usable if last else None,
+        "imagery_provider": settings.imagery_provider,
+    }
+
+
+@router.get("/zones")
+async def list_zones(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin", "super_admin")),
+):
+    result = await db.execute(select(Zone))
+    return result.scalars().all()

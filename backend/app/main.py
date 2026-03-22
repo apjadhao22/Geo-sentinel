@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, admin, spots, audit
+from app.routers import auth, admin, spots, audit, images
 
 app = FastAPI(title="PCMC Construction Detection", version="0.1.0")
 
@@ -17,3 +17,4 @@ app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(spots.router)
 app.include_router(audit.router)
+app.include_router(images.router)

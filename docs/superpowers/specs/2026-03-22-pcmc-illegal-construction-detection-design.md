@@ -77,7 +77,7 @@ SatelliteImage
 ├── resolution_meters (float)
 ├── bounds (PostGIS geometry - polygon)
 ├── is_usable (boolean)
-└── source (string - "planet_planetscope" / "planet_skysat")
+└── source (string - "planet_planetscope")
 ```
 
 ---
@@ -249,7 +249,9 @@ Admin
 ├── GET    /users                — list officers
 ├── POST   /users                — create officer account
 ├── PATCH  /users/{id}           — update role/status
-└── GET    /system/health        — pipeline status, last ingestion, model version
+├── PATCH  /spots/{id}/assign    — reassign spot to a different reviewer
+├── GET    /system/health        — pipeline status, last ingestion, model version, quota usage
+└── GET    /zones                — list zones with assigned reviewers
 
 Super Admin
 ├── GET    /audit/logs           — all officer actions, filterable by officer/action/date
@@ -258,8 +260,9 @@ Super Admin
 
 ### Spot Assignment
 
-- When new spots are created, they are auto-assigned to reviewers using **geographic zone-based assignment**. The PCMC area is divided into zones, each assigned to a reviewer. Admins can reassign spots manually.
-- `PATCH /spots/{id}/assign` — admin endpoint to reassign a spot to a different reviewer
+- The PCMC area is divided into zones. Each zone is mapped to a reviewer via a `zone` field on the `User` model. When new spots are created, they are auto-assigned to the reviewer whose zone contains the spot's centroid. Admins can reassign spots manually.
+- Zone boundaries are stored as PostGIS polygons in a `Zone` table (`id`, `name`, `geometry`, `assigned_reviewer_id`).
+- `PATCH /spots/{id}/assign` — admin endpoint to reassign a spot to a different reviewer (listed under Admin endpoints below)
 
 ### Review Rules
 

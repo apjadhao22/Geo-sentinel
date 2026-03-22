@@ -11,9 +11,14 @@ from alembic import context
 from app.database import Base
 from app.models import *  # noqa
 
+from app.config import settings as app_settings
+
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Override URL from application settings so there's a single source of truth
+config.set_main_option("sqlalchemy.url", app_settings.database_url)
 
 target_metadata = Base.metadata
 

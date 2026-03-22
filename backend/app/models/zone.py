@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, ForeignKey
+from sqlalchemy import Column, String
 from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geometry
 from sqlalchemy.orm import relationship

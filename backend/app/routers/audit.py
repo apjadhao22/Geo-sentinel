@@ -1,7 +1,9 @@
+from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
-from typing import Optional
 
 from app.database import get_db
 from app.models.user import User
@@ -16,8 +18,8 @@ router = APIRouter(prefix="/audit", tags=["audit"])
 async def audit_logs(
     officer_id: Optional[UUID] = None,
     action: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
     limit: int = Query(default=100, le=500),
     offset: int = 0,
     db: AsyncSession = Depends(get_db),

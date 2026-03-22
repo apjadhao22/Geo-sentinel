@@ -1,11 +1,14 @@
+from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from uuid import UUID
-from typing import Optional
 
 from app.database import get_db
 from app.models.construction_spot import ConstructionSpot
+from app.models.detection import Detection
 from app.models.user import User
 from app.schemas.spot import SpotOut, SpotDetail, SpotReviewRequest, SpotAssignRequest, SpotStats
 from app.services.spot_service import review_spot, get_spot_stats
@@ -18,8 +21,8 @@ router = APIRouter(prefix="/spots", tags=["spots"])
 async def list_spots(
     status: Optional[str] = None,
     change_type: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
     min_area: Optional[float] = None,
     limit: int = Query(default=100, le=500),
     offset: int = 0,
@@ -36,7 +39,6 @@ async def list_spots(
     if date_to:
         query = query.where(ConstructionSpot.first_detected_at <= date_to)
     if min_area:
-        from app.models.detection import Detection
         query = query.join(Detection).where(Detection.area_sq_meters >= min_area).distinct()
     query = query.limit(limit).offset(offset)
     result = await db.execute(query)

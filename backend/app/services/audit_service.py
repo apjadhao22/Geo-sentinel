@@ -1,6 +1,9 @@
+from datetime import datetime
 from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+
 from app.models.audit_log import AuditLog
 
 
@@ -17,10 +20,10 @@ async def create_audit_log(
 
 async def get_audit_logs(
     db: AsyncSession,
-    officer_id: UUID = None,
-    action: str = None,
-    date_from: str = None,
-    date_to: str = None,
+    officer_id: UUID | None = None,
+    action: str | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     limit: int = 100,
     offset: int = 0,
 ):

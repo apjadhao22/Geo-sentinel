@@ -2,6 +2,7 @@ import pytest
 from datetime import datetime, timezone
 from geoalchemy2.shape import from_shape
 from shapely.geometry import box
+from sqlalchemy import select
 from app.models import ConstructionSpot, AuditLog
 from app.services.audit_service import create_audit_log, get_audit_logs
 
@@ -29,7 +30,7 @@ async def test_create_audit_log(db_session, officer_and_spot):
     await db_session.flush()
 
     result = await db_session.execute(
-        __import__("sqlalchemy", fromlist=["select"]).select(AuditLog).where(AuditLog.spot_id == spot.id)
+        select(AuditLog).where(AuditLog.spot_id == spot.id)
     )
     logs = result.scalars().all()
     assert len(logs) == 1

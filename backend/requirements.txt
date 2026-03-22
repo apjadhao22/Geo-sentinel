@@ -18,6 +18,7 @@ opencv-python-headless==4.10.0.84
 torch==2.5.1
 torchvision==0.20.1
 scikit-image==0.24.0
+scipy==1.14.1
 httpx==0.28.0
 pytest==8.3.4
 pytest-asyncio==0.24.0

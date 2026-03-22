@@ -1,13 +1,10 @@
 from datetime import datetime, timezone
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
+from app.database import async_session_factory as session_factory
 from app.models.construction_spot import ConstructionSpot
 from app.models.notification import Notification
-
-engine = create_async_engine(settings.database_url)
-session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def check_expired_grace_periods():

@@ -1,14 +1,14 @@
+import logging
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import select, delete
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import select
 
 from app.config import settings
+from app.database import async_session_factory as session_factory
 from app.models.satellite_image import SatelliteImage
 from app.storage import get_client
 
-engine = create_async_engine(settings.database_url)
-session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+logger = logging.getLogger(__name__)
 
 
 async def cleanup_old_images():
@@ -24,8 +24,11 @@ async def cleanup_old_images():
         for image in old_images:
             try:
                 minio_client.remove_object(settings.minio_bucket, image.storage_path)
-            except Exception:
-                pass  # Object may already be deleted
+            except Exception as e:
+                err_str = str(e)
+                if "NoSuchKey" not in err_str and "does not exist" not in err_str.lower():
+                    logger.warning("MinIO delete failed for %s: %s", image.storage_path, e)
+                    continue  # skip DB delete to preserve consistency
             await db.delete(image)
             deleted_count += 1
 

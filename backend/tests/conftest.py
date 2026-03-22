@@ -48,6 +48,15 @@ async def override_db(db_session):
 
 
 @pytest.fixture
+async def client():
+    from httpx import AsyncClient, ASGITransport
+    from app.main import app as fastapi_app
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+@pytest.fixture
 async def seed_users(db_session):
     users = [
         User(username="officer1", password_hash=hash_password("test123"), full_name="Officer One", role="reviewer"),

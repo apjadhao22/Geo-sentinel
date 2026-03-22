@@ -20,7 +20,7 @@ A satellite imagery-based system that detects illegal construction activity with
 - **Database:** PostgreSQL + PostGIS for geospatial data
 - **Object Storage:** MinIO (self-hosted, S3-compatible) for satellite imagery
 - **ML:** PyTorch, Siamese U-Net for change detection
-- **Satellite Imagery:** Planet Labs API (PlanetScope for daily 3-5m resolution)
+- **Satellite Imagery:** Imagery-source-agnostic design. Phase 1 (prototype): Sentinel-2 (free, 10m resolution, 5-day revisit). Phase 2 (production): Planet Labs PlanetScope (paid, 3-5m resolution, daily revisit, est. ~19,000-33,000 INR/month for PCMC coverage)
 - **Auth:** JWT-based authentication
 - **Coordinate System:** EPSG:4326 (WGS84) for storage, EPSG:32643 (UTM Zone 43N) for area calculations
 
@@ -45,20 +45,41 @@ Five core components:
 
 ## Component 1: Image Ingestion Service
 
+### Phased Imagery Strategy
+
+The ingestion service is designed to be **imagery-source-agnostic** with a provider abstraction layer:
+
+**Phase 1 — Prototype (Sentinel-2, free):**
+- Uses Copernicus Data Space Ecosystem API (free, requires registration)
+- 10m resolution, 5-day revisit cycle
+- Sufficient for validating the ML pipeline, detecting large-scale land clearing and new structures
+- Limited for detecting smaller changes (extensions, early excavation) due to resolution
+- Allows demonstrating a working system to PCMC commissioner without budget approval
+
+**Phase 2 — Production (Planet Labs PlanetScope, paid):**
+- 3-5m resolution, daily revisit
+- Estimated cost: ~19,000-33,000 INR/month ($225-$400/month) for PCMC's 181 sq km
+- Planet offers government/public sector discounts; PCMC should negotiate directly
+- Unlocks full detection capability including subtle pre-construction activity
+
+**Switching between providers** requires only configuring the imagery provider in the ingestion service — the ML pipeline, flagging, and dashboard are provider-independent.
+
 ### Behavior
 
-- A daily cron job (Celery Beat) triggers at a fixed time (e.g., 6:00 AM IST)
-- Calls the Planet Labs API with the PCMC boundary polygon as the area of interest
+- A scheduled job (Celery Beat) triggers at a fixed time (e.g., 6:00 AM IST)
+- Calls the configured imagery provider API with the PCMC boundary polygon as the area of interest
+- Phase 1: every 5 days (Sentinel-2 revisit cycle). Phase 2: daily (PlanetScope)
 - Downloads the latest available image (may arrive as multiple tiles, stitched into a composite)
 - Stores raw imagery in MinIO with metadata
 - If cloud cover exceeds 30% over a tile, that tile is marked unusable; the system falls back to the last clear image for comparison
 - After successful ingestion, publishes an event (Celery task) to trigger the ML pipeline
 
-### API Quota Management
+### API Quota Management (Phase 2 only)
 
 - PlanetScope subscriptions have monthly download quotas (measured in sq km). At ~181 sq km/day, expected monthly consumption is ~5,430 sq km.
 - The ingestion service tracks cumulative monthly quota usage and surfaces it on the admin dashboard.
 - When quota usage reaches 80%, admins are alerted. At 95%, the system switches to every-other-day ingestion to conserve quota.
+- Not applicable in Phase 1 (Sentinel-2 is free and unlimited).
 
 ### Failure Handling
 

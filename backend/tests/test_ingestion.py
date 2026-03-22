@@ -30,3 +30,10 @@ async def test_planet_provider_raises_not_implemented():
             start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
             end_date=datetime(2026, 1, 2, tzinfo=timezone.utc),
         )
+
+
+@pytest.mark.asyncio
+async def test_planet_provider_download_raises_not_implemented():
+    provider = PlanetProvider(api_key="test")
+    with pytest.raises(NotImplementedError):
+        await provider.download_image("some-id", "/tmp/out.tif")

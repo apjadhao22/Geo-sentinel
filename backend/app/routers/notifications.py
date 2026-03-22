@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
@@ -32,5 +32,7 @@ async def read_notification(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    await mark_read(db, notification_id, user.id)
+    notification = await mark_read(db, notification_id, user.id)
+    if notification is None:
+        raise HTTPException(status_code=404, detail="Notification not found")
     return {"status": "ok"}

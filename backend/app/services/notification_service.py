@@ -6,9 +6,10 @@ from app.models.notification import Notification
 
 
 async def get_notifications(db: AsyncSession, user_id: UUID, unread_only: bool = False):
-    query = select(Notification).where(Notification.user_id == user_id).order_by(Notification.created_at.desc()).limit(50)
+    query = select(Notification).where(Notification.user_id == user_id).order_by(Notification.created_at.desc())
     if unread_only:
         query = query.where(Notification.is_read == False)
+    query = query.limit(50)
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -19,7 +20,7 @@ async def get_unread_count(db: AsyncSession, user_id: UUID) -> int:
             Notification.user_id == user_id, Notification.is_read == False
         )
     )
-    return result.scalar()
+    return result.scalar() or 0
 
 
 async def mark_read(db: AsyncSession, notification_id: UUID, user_id: UUID):

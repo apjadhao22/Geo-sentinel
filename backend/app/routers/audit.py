@@ -7,7 +7,7 @@ from app.database import get_db
 from app.models.user import User
 from app.services.audit_service import get_audit_logs, get_officer_summary
 from app.dependencies import require_role
-from app.schemas.audit import AuditLogOut
+from app.schemas.audit import AuditLogOut, OfficerSummaryOut
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
@@ -34,7 +34,7 @@ async def audit_logs(
     )
 
 
-@router.get("/officer-summary")
+@router.get("/officer-summary", response_model=list[OfficerSummaryOut])
 async def officer_summary(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("super_admin")),

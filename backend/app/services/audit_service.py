@@ -43,7 +43,7 @@ async def get_officer_summary(db: AsyncSession):
         select(
             AuditLog.officer_id,
             AuditLog.action,
-            func.count(AuditLog.id),
+            func.count(AuditLog.id).label("count"),
         )
         .group_by(AuditLog.officer_id, AuditLog.action)
     )

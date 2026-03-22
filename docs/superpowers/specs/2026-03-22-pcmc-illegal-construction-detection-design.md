@@ -20,7 +20,9 @@ A satellite imagery-based system that detects illegal construction activity with
 - **Database:** PostgreSQL + PostGIS for geospatial data
 - **Object Storage:** MinIO (self-hosted, S3-compatible) for satellite imagery
 - **ML:** PyTorch, Siamese U-Net for change detection
-- **Satellite Imagery:** Planet Labs API (PlanetScope for daily 3-5m resolution, SkySat for sub-meter when needed)
+- **Satellite Imagery:** Planet Labs API (PlanetScope for daily 3-5m resolution)
+- **Auth:** JWT-based authentication
+- **Coordinate System:** EPSG:4326 (WGS84) for storage, EPSG:32643 (UTM Zone 43N) for area calculations
 
 ## System Architecture
 
@@ -51,6 +53,12 @@ Five core components:
 - Stores raw imagery in MinIO with metadata
 - If cloud cover exceeds 30% over a tile, that tile is marked unusable; the system falls back to the last clear image for comparison
 - After successful ingestion, publishes an event (Celery task) to trigger the ML pipeline
+
+### API Quota Management
+
+- PlanetScope subscriptions have monthly download quotas (measured in sq km). At ~181 sq km/day, expected monthly consumption is ~5,430 sq km.
+- The ingestion service tracks cumulative monthly quota usage and surfaces it on the admin dashboard.
+- When quota usage reaches 80%, admins are alerted. At 95%, the system switches to every-other-day ingestion to conserve quota.
 
 ### Failure Handling
 
@@ -105,15 +113,15 @@ For each day's image, comparisons run against multiple baselines:
 ### Baseline Image Selection
 
 - For each interval, pick the best usable image closest to the target date (e.g., for 7-day, if day-7 had heavy cloud cover, use day-6 or day-8)
-- A rolling window of the last 30 days of usable images is maintained
+- A rolling window of the last 60 days of usable images is maintained (extended beyond 30 days to handle monsoon season gaps)
 
 ### Pipeline Steps
 
 1. **Preprocessing** — Geo-registration alignment, pixel value normalization, split into 256x256 patches with overlap
 2. **Inference** — Run each patch pair through the model, producing a probability mask (0-1) per pixel
-3. **Post-processing** — Threshold probability mask (>0.6), morphological operations (noise removal, gap filling), merge patches back into full map
-4. **Region extraction** — Connected component analysis to identify distinct change regions. Each region becomes a detection polygon with centroid, bounding box, area in sq meters, and confidence score
-5. **Classification** — Lightweight classification head categorizes each detection as: `excavation`, `foundation`, `new_structure`, `extension`, `land_clearing`
+3. **Post-processing** — Threshold probability mask using per-interval thresholds (1-day: 0.85, 7-day: 0.7, 15-day: 0.6, 30-day: 0.5), morphological operations (noise removal, gap filling), merge patches back into full map
+4. **Region extraction** — Connected component analysis to identify distinct change regions. Regions below the minimum area threshold (configurable, default: 50 sq meters) are discarded. Each remaining region becomes a detection polygon with centroid, bounding box, area in sq meters, and confidence score
+5. **Classification** — Lightweight classification head categorizes each detection as: `excavation`, `foundation`, `new_structure`, `extension`, `land_clearing`. Initially bootstrapped with rule-based heuristics (e.g., area size, shape regularity, proximity to existing structures) until sufficient officer-labeled data accumulates for ML-based classification
 
 ### Model Training
 
@@ -163,6 +171,11 @@ Detection polygon arrives
 ┌──────────┐    officer marks
 │ ILLEGAL  │──────resolved──────▶ RESOLVED
 └──────────┘
+
+RESOLVED spots re-enter monitoring: if the ML pipeline detects new change
+at a RESOLVED location, a new ConstructionSpot is created (linked to the
+old spot via `previous_spot_id` for history). This handles cases where
+construction resumes after demolition or a new project starts at the same site.
 ```
 
 ### Spatial Merging
@@ -192,6 +205,9 @@ ConstructionSpot
 ├── reviewed_by (FK to User, nullable)
 ├── reviewed_at (timestamp, nullable)
 ├── notes (text, nullable)
+├── assigned_to (FK to User, nullable — the reviewer responsible for this spot)
+├── previous_spot_id (FK to ConstructionSpot, nullable — links to prior RESOLVED spot at same location)
+├── version (integer — incremented on each status change, used for optimistic locking)
 └── detections[] (one-to-many)
 
 Detection
@@ -240,10 +256,16 @@ Super Admin
 ├── GET    /audit/officer-summary — review stats per officer (spots reviewed, legal vs illegal breakdown)
 ```
 
+### Spot Assignment
+
+- When new spots are created, they are auto-assigned to reviewers using **geographic zone-based assignment**. The PCMC area is divided into zones, each assigned to a reviewer. Admins can reassign spots manually.
+- `PATCH /spots/{id}/assign` — admin endpoint to reassign a spot to a different reviewer
+
 ### Review Rules
 
 - When marking a spot as **LEGAL** or **RE_APPROVED**, the `notes` field is **mandatory** (non-empty). The officer must provide justification (e.g., permit number, meeting reference).
 - All other actions (mark illegal, mark resolved) accept optional notes.
+- **Optimistic locking:** The `PATCH /spots/{id}/review` endpoint requires a `version` field. If the spot's current version doesn't match, the request is rejected (HTTP 409 Conflict), preventing stale writes from concurrent officer actions.
 
 ---
 
@@ -257,6 +279,7 @@ Super Admin
   - Orange = FLAGGED (pending review)
   - Yellow = REVIEW_PENDING (12-month re-review due)
   - Green = LEGAL (faint, toggleable)
+  - Grey = RESOLVED (hidden by default, toggleable)
 - Click a spot to open detail panel
 
 ### Spot Detail Panel
@@ -320,3 +343,12 @@ AuditLog
   - 12-month reviews due
   - Pipeline failures (admin and super admin only)
 - Optional email alerts for the same events
+
+---
+
+## Data Retention
+
+- **Raw satellite images:** Retained for 24 months in MinIO, then archived to cold storage (or deleted if cold storage is not configured)
+- **Change masks:** Retained indefinitely (small relative to raw imagery)
+- **Database records:** Retained indefinitely (spots, detections, audit logs)
+- Expected storage growth: ~50-100 MB/day for raw imagery (~18-36 GB/year), change masks ~5-10 MB/day

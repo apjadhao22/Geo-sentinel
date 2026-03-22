@@ -15,13 +15,14 @@ export default function SpotDetailPanel({ spot, onClose, onReviewed }: Props) {
   const handleReview = async (action: string) => {
     try {
       if ((action === "marked_legal" || action === "re_approved") && !notes.trim()) {
-        setError("Notes are required when marking as legal");
+        setError("Notes are required for this action");
         return;
       }
       await reviewSpot(spot.id, action, spot.version, notes || undefined);
       onReviewed();
-    } catch (err: any) {
-      if (err.response?.status === 409) {
+    } catch (err: unknown) {
+      const status = (err as any)?.response?.status;
+      if (status === 409) {
         setError("Conflict: this spot was modified by another user. Please refresh.");
       } else {
         setError("Failed to update spot");

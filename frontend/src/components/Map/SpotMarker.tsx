@@ -15,7 +15,7 @@ interface Props {
 }
 
 export default function SpotMarker({ spot, onClick }: Props) {
-  if (!spot.latitude || !spot.longitude) return null;
+  if (spot.latitude == null || spot.longitude == null) return null;
 
   return (
     <CircleMarker

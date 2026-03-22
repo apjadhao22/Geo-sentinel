@@ -8,11 +8,14 @@ export function useSpots(filters?: { status?: string }) {
 
   const fetchSpots = async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (filters?.status) params.set("status", filters.status);
-    const res = await api.get(`/spots?${params}`);
-    setSpots(res.data);
-    setLoading(false);
+    try {
+      const params = new URLSearchParams();
+      if (filters?.status) params.set("status", filters.status);
+      const res = await api.get(`/spots?${params}`);
+      setSpots(res.data);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchSpots(); }, [filters?.status]);

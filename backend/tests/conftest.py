@@ -1,3 +1,4 @@
+import os
 import pytest
 import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -5,7 +6,10 @@ from app.database import Base
 from app.models.user import User
 from app.services.auth_service import hash_password
 
-TEST_DATABASE_URL = "postgresql+asyncpg://pcmc:pcmc_dev_password@localhost:5432/pcmc_construction_test"
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://pcmc:pcmc_dev_password@localhost:5432/pcmc_construction_test",
+)
 
 
 @pytest.fixture(scope="session")
@@ -18,8 +22,12 @@ def event_loop():
 @pytest.fixture(scope="session")
 async def test_engine():
     engine = create_async_engine(TEST_DATABASE_URL)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as exc:
+        await engine.dispose()
+        pytest.skip(f"Test database unavailable: {exc}")
     yield engine
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

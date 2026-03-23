@@ -10,7 +10,7 @@ from app.database import get_db
 from app.models.construction_spot import ConstructionSpot
 from app.models.detection import Detection
 from app.models.user import User
-from app.schemas.spot import SpotOut, SpotDetail, SpotReviewRequest, SpotAssignRequest, SpotStats
+from app.schemas.spot import SpotOut, SpotDetail, SpotReviewRequest, SpotAssignRequest, SpotStats, DetectionOut
 from app.services.spot_service import review_spot, get_spot_stats
 from app.dependencies import get_current_user, require_role
 
@@ -120,3 +120,17 @@ async def assign_spot(
     spot.assigned_to_id = body.assigned_to_id
     await db.commit()
     return await _get_spot_with_coords(db, spot_id)
+
+
+@router.get("/{spot_id}/detections", response_model=list[DetectionOut])
+async def list_detections(
+    spot_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Detection)
+        .where(Detection.spot_id == spot_id)
+        .order_by(Detection.detected_at.desc())
+    )
+    return result.scalars().all()

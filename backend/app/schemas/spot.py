@@ -51,3 +51,17 @@ class SpotStats(BaseModel):
     illegal: int = 0
     resolved: int = 0
     review_pending: int = 0
+
+
+class DetectionOut(BaseModel):
+    id: UUID
+    spot_id: UUID
+    detected_at: datetime
+    comparison_interval: str
+    confidence: float
+    image_before_id: UUID
+    image_after_id: UUID
+    area_sq_meters: float
+
+    class Config:
+        from_attributes = True

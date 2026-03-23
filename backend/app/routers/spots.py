@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.database import get_db
 from app.models.construction_spot import ConstructionSpot
@@ -15,6 +15,23 @@ from app.services.spot_service import review_spot, get_spot_stats
 from app.dependencies import get_current_user, require_role
 
 router = APIRouter(prefix="/spots", tags=["spots"])
+
+
+def _with_centroid(query):
+    """Add ST_X/ST_Y centroid columns to a ConstructionSpot query."""
+    centroid = func.ST_Centroid(ConstructionSpot.geometry)
+    return query.add_columns(
+        func.ST_Y(centroid).label("latitude"),
+        func.ST_X(centroid).label("longitude"),
+    )
+
+
+def _build_spot_out(row) -> SpotOut:
+    spot, lat, lng = row
+    d = SpotOut.model_validate(spot)
+    d.latitude = lat
+    d.longitude = lng
+    return d
 
 
 @router.get("", response_model=list[SpotOut])
@@ -40,9 +57,9 @@ async def list_spots(
         query = query.where(ConstructionSpot.first_detected_at <= date_to)
     if min_area:
         query = query.join(Detection).where(Detection.area_sq_meters >= min_area).distinct()
-    query = query.limit(limit).offset(offset)
+    query = _with_centroid(query).limit(limit).offset(offset)
     result = await db.execute(query)
-    return result.scalars().all()
+    return [_build_spot_out(row) for row in result.all()]
 
 
 @router.get("/stats", response_model=SpotStats)
@@ -53,19 +70,29 @@ async def stats(db: AsyncSession = Depends(get_db), user: User = Depends(get_cur
 
 @router.get("/review-pending", response_model=list[SpotOut])
 async def review_pending(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    result = await db.execute(
+    query = _with_centroid(
         select(ConstructionSpot).where(ConstructionSpot.status == "review_pending")
     )
-    return result.scalars().all()
+    result = await db.execute(query)
+    return [_build_spot_out(row) for row in result.all()]
+
+
+async def _get_spot_with_coords(db: AsyncSession, spot_id: UUID) -> SpotDetail:
+    query = _with_centroid(select(ConstructionSpot).where(ConstructionSpot.id == spot_id))
+    result = await db.execute(query)
+    row = result.one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Spot not found")
+    spot, lat, lng = row
+    d = SpotDetail.model_validate(spot)
+    d.latitude = lat
+    d.longitude = lng
+    return d
 
 
 @router.get("/{spot_id}", response_model=SpotDetail)
 async def get_spot(spot_id: UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    result = await db.execute(select(ConstructionSpot).where(ConstructionSpot.id == spot_id))
-    spot = result.scalar_one_or_none()
-    if not spot:
-        raise HTTPException(status_code=404, detail="Spot not found")
-    return spot
+    return await _get_spot_with_coords(db, spot_id)
 
 
 @router.patch("/{spot_id}/review", response_model=SpotDetail)
@@ -75,7 +102,8 @@ async def review(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await review_spot(db, spot_id, body.action, body.version, user, body.notes)
+    await review_spot(db, spot_id, body.action, body.version, user, body.notes)
+    return await _get_spot_with_coords(db, spot_id)
 
 
 @router.patch("/{spot_id}/assign", response_model=SpotDetail)
@@ -91,5 +119,4 @@ async def assign_spot(
         raise HTTPException(status_code=404, detail="Spot not found")
     spot.assigned_to_id = body.assigned_to_id
     await db.commit()
-    await db.refresh(spot)
-    return spot
+    return await _get_spot_with_coords(db, spot_id)

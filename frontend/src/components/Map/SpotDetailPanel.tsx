@@ -3,8 +3,6 @@ import { reviewSpot } from "../../hooks/useSpots";
 import type { SpotDetail } from "../../types";
 import api from "../../api/client";
 
-const API_BASE = "http://localhost:8000";
-
 interface Detection {
   id: string;
   detected_at: string;
@@ -18,6 +16,18 @@ interface ImageCompare {
   after_url: string;
   before_captured_at: string;
   after_captured_at: string;
+}
+
+interface ImageBlobs {
+  before_blob: string;
+  after_blob: string;
+  before_captured_at: string;
+  after_captured_at: string;
+}
+
+async function fetchBlob(url: string): Promise<string> {
+  const res = await api.get(url, { responseType: "blob" });
+  return URL.createObjectURL(res.data);
 }
 
 interface Props {
@@ -38,28 +48,33 @@ export default function SpotDetailPanel({ spot, onClose, onReviewed }: Props) {
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [detections, setDetections] = useState<Detection[]>([]);
-  const [images, setImages] = useState<ImageCompare | null>(null);
+  const [imageBlobs, setImageBlobs] = useState<ImageBlobs | null>(null);
   const [loadingImages, setLoadingImages] = useState(false);
 
   useEffect(() => {
     setDetections([]);
-    setImages(null);
+    setImageBlobs(null);
     setNotes("");
     setError("");
-    api.get(`/spots/${spot.id}/detections`).then((res) => {
+    api.get(`/spots/${spot.id}/detections`).then(async (res) => {
       setDetections(res.data);
       if (res.data.length > 0) {
         setLoadingImages(true);
-        api.get(`/images/compare?detection_id=${res.data[0].id}`)
-          .then((r) => {
-            const d = r.data;
-            setImages({
-              ...d,
-              before_url: API_BASE + d.before_url,
-              after_url: API_BASE + d.after_url,
-            });
-          })
-          .finally(() => setLoadingImages(false));
+        try {
+          const { data } = await api.get<ImageCompare>(`/images/compare?detection_id=${res.data[0].id}`);
+          const [beforeBlob, afterBlob] = await Promise.all([
+            fetchBlob(data.before_url),
+            fetchBlob(data.after_url),
+          ]);
+          setImageBlobs({
+            before_blob: beforeBlob,
+            after_blob: afterBlob,
+            before_captured_at: data.before_captured_at,
+            after_captured_at: data.after_captured_at,
+          });
+        } finally {
+          setLoadingImages(false);
+        }
       }
     });
   }, [spot.id]);
@@ -125,42 +140,32 @@ export default function SpotDetailPanel({ spot, onClose, onReviewed }: Props) {
 
       {loadingImages && <p style={{ color: "#888", fontSize: 13 }}>Loading imagery…</p>}
 
-      {images && (
+      {imageBlobs && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
           <div>
             <p style={{ margin: "0 0 4px", fontSize: 11, color: "#666", textAlign: "center", textTransform: "uppercase", letterSpacing: 1 }}>
-              Before · {new Date(images.before_captured_at).toLocaleDateString()}
+              Before · {new Date(imageBlobs.before_captured_at).toLocaleDateString()}
             </p>
             <img
-              src={images.before_url}
+              src={imageBlobs.before_blob}
               alt="Before"
               style={{ width: "100%", borderRadius: 4, border: "2px solid #4caf50", display: "block", objectFit: "cover", aspectRatio: "1" }}
-              onError={(e) => {
-                const el = e.target as HTMLImageElement;
-                el.style.display = "none";
-                el.insertAdjacentHTML("afterend", '<div style="height:150px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-size:12px;color:#aaa;border-radius:4px">No image</div>');
-              }}
             />
           </div>
           <div>
             <p style={{ margin: "0 0 4px", fontSize: 11, color: "#666", textAlign: "center", textTransform: "uppercase", letterSpacing: 1 }}>
-              After · {new Date(images.after_captured_at).toLocaleDateString()}
+              After · {new Date(imageBlobs.after_captured_at).toLocaleDateString()}
             </p>
             <img
-              src={images.after_url}
+              src={imageBlobs.after_blob}
               alt="After"
               style={{ width: "100%", borderRadius: 4, border: "2px solid #f44336", display: "block", objectFit: "cover", aspectRatio: "1" }}
-              onError={(e) => {
-                const el = e.target as HTMLImageElement;
-                el.style.display = "none";
-                el.insertAdjacentHTML("afterend", '<div style="height:150px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-size:12px;color:#aaa;border-radius:4px">No image</div>');
-              }}
             />
           </div>
         </div>
       )}
 
-      {!loadingImages && !images && (
+      {!loadingImages && !imageBlobs && (
         <p style={{ color: "#aaa", fontSize: 13 }}>No detection imagery available.</p>
       )}
 

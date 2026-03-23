@@ -22,7 +22,7 @@ export default function LoginPage() {
   return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#f5f5f5" }}>
       <form onSubmit={handleSubmit} style={{ background: "white", padding: 32, borderRadius: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.1)", width: 360 }}>
-        <h2 style={{ marginBottom: 24 }}>PCMC Construction Monitor</h2>
+        <h2 style={{ marginBottom: 24 }}>Geo Sentinel</h2>
         {error && <p style={{ color: "red" }}>{error}</p>}
         <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} style={{ width: "100%", padding: 8, marginBottom: 12, boxSizing: "border-box" }} />
         <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%", padding: 8, marginBottom: 16, boxSizing: "border-box" }} />

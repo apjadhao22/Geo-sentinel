@@ -3,6 +3,8 @@ import { reviewSpot } from "../../hooks/useSpots";
 import type { SpotDetail } from "../../types";
 import api from "../../api/client";
 
+const API_BASE = "http://localhost:8000";
+
 interface Detection {
   id: string;
   detected_at: string;
@@ -49,7 +51,14 @@ export default function SpotDetailPanel({ spot, onClose, onReviewed }: Props) {
       if (res.data.length > 0) {
         setLoadingImages(true);
         api.get(`/images/compare?detection_id=${res.data[0].id}`)
-          .then((r) => setImages(r.data))
+          .then((r) => {
+            const d = r.data;
+            setImages({
+              ...d,
+              before_url: API_BASE + d.before_url,
+              after_url: API_BASE + d.after_url,
+            });
+          })
           .finally(() => setLoadingImages(false));
       }
     });

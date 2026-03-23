@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
 
     minio_endpoint: str = "minio:9000"
+    minio_public_endpoint: str = "localhost:9000"
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
     minio_bucket: str = "satellite-imagery"

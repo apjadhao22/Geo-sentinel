@@ -9,7 +9,7 @@ export default function Layout() {
   return (
     <div style={{ display: "flex", height: "100vh" }}>
       <nav style={{ width: 220, background: "#1a237e", color: "white", padding: 16, display: "flex", flexDirection: "column" }}>
-        <h3 style={{ marginBottom: 24 }}>PCMC Monitor</h3>
+        <h3 style={{ marginBottom: 24 }}>Geo Sentinel</h3>
         <Link to="/" style={{ color: "white", marginBottom: 12, textDecoration: "none" }}>Map</Link>
         <Link to="/dashboard" style={{ color: "white", marginBottom: 12, textDecoration: "none" }}>Dashboard</Link>
         {(user?.role === "admin" || user?.role === "super_admin") && (

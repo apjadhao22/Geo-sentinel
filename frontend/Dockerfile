@@ -9,7 +9,4 @@ COPY . .
 
 EXPOSE 3000
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
-
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
